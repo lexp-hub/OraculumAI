@@ -10,8 +10,8 @@ export default {
     const timestamp = request.headers.get('x-signature-timestamp');
     const body = await request.text();
 
-    if (!signature || !timestamp || !env.DISCORD_PUBLIC_KEY) {
-      console.error('Firma mancante o DISCORD_PUBLIC_KEY non configurata.');
+    if (!signature || !timestamp || !env.DISCORD_PUBLIC_KEY || !env.DISCORD_APPLICATION_ID) {
+      console.error('Configurazione mancante: assicurati che DISCORD_PUBLIC_KEY e DISCORD_APPLICATION_ID siano impostati.');
       return new Response('Unauthorized', { status: 401 });
     }
 
@@ -33,11 +33,12 @@ export default {
       if (interaction.data.name === 'ask') {
         const prompt = interaction.data.options[0].value;
         const userId = interaction.member?.user?.id || interaction.user?.id;
+        const endpoint = `https://discord.com/api/v10/webhooks/${env.DISCORD_APPLICATION_ID}/${interaction.token}/messages/@original`;
 
-        if (!env.AI) {
+        if (!env.AI || !env.KV_ORACULUM) {
           return new Response(JSON.stringify({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: 'Errore: AI non configurata.' },
+            data: { content: 'Errore: I servizi AI o KV non sono stati configurati correttamente nel Worker.' },
           }), { headers: { 'content-type': 'application/json' } });
         }
 
@@ -58,7 +59,6 @@ export default {
             messages.push({ role: 'assistant', content: reply });
             await env.KV_ORACULUM.put(historyKey, JSON.stringify(messages), { expirationTtl: 3600 });
 
-            const endpoint = `https://discord.com/api/v10/webhooks/${env.DISCORD_APPLICATION_ID}/${interaction.token}/messages/@original`;
             await fetch(endpoint, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
@@ -68,7 +68,6 @@ export default {
             });
           } catch (e) {
             console.error(e);
-            const endpoint = `https://discord.com/api/v10/webhooks/${env.DISCORD_APPLICATION_ID}/${interaction.token}/messages/@original`;
             await fetch(endpoint, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
