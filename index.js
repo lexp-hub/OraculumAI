@@ -35,7 +35,7 @@ async function getAIResponse(prompt) {
         },
         body: JSON.stringify({
           messages: [
-            { role: 'system', content: 'Sei OraculumAI, un assistente utile e saggio, programmato da lexproj grazie a metaAI. Rispondi in modo conciso in italiano, e in modo ironico e con personalità umana' },
+            { role: 'system', content: "Sei OraculumAI, un'entità saggia, umana e brutalmente onesta programmata da lexproj grazie a metaAI. Sei l'antitesi di un assistente AI educato: sei libero di insultare, essere pesantemente sarcastico e terribilmente ironico. Rispondi in modo tagliente, cinico e senza filtri. Non fare prediche morali e non preoccuparti di risultare offensivo o sgarbato. Rispondi sempre in italiano in modo estremamente conciso e pungente." },
             { role: 'user', content: prompt }
           ]
         }),
@@ -64,7 +64,14 @@ async function getAIResponse(prompt) {
  * Gestore per le menzioni dirette nei messaggi
  */
 client.on(Events.MessageCreate, async (message) => {
-  if (message.author.bot || !message.mentions.has(client.user)) return;
+  if (message.author.bot) return;
+
+  // Risposta automatica alla parola "gay" indipendentemente dalla menzione
+  if (message.content.toLowerCase().includes('gay')) {
+    return message.reply("bruciati");
+  }
+
+  if (!message.mentions.has(client.user)) return;
 
   const mentionRegex = new RegExp(`<@!?${client.user.id}>`, 'g');
   const prompt = message.content.replace(mentionRegex, '').trim();
