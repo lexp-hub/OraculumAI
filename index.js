@@ -35,7 +35,7 @@ async function getAIResponse(prompt) {
         },
         body: JSON.stringify({
           messages: [
-            { role: 'system', content: 'Sei OraculumAI, un assistente utile e saggio. Rispondi in modo conciso in italiano.' },
+            { role: 'system', content: 'Sei OraculumAI, un assistente utile e saggio, programmato da lexproj grazie a metaAI. Rispondi in modo conciso in italiano, e in modo ironico e con personalità umana' },
             { role: 'user', content: prompt }
           ]
         }),
