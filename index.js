@@ -10,9 +10,14 @@ export default {
     const timestamp = request.headers.get('x-signature-timestamp');
     const body = await request.text();
     
+    if (!env.DISCORD_PUBLIC_KEY) {
+      console.error('DISCORD_PUBLIC_KEY non configurata nei segreti di Cloudflare.');
+      return new Response('Configurazione mancante', { status: 500 });
+    }
+
     const isValidRequest = verifyKey(body, signature, timestamp, env.DISCORD_PUBLIC_KEY);
     if (!isValidRequest) {
-      console.error('Verifica della firma fallita. Controlla DISCORD_PUBLIC_KEY.');
+      console.error('Verifica della firma fallita. Assicurati che la Public Key nel portale Discord coincida con il segreto.');
       return new Response('Bad request signature', { status: 401 });
     }
 
