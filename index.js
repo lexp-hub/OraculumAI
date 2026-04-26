@@ -10,14 +10,8 @@ export default {
     const timestamp = request.headers.get('x-signature-timestamp');
     const body = await request.text();
 
-    if (!signature || !timestamp || !env.DISCORD_PUBLIC_KEY || !env.DISCORD_APPLICATION_ID) {
-      console.error('Configurazione mancante: assicurati che DISCORD_PUBLIC_KEY e DISCORD_APPLICATION_ID siano impostati.');
-      return new Response('Unauthorized', { status: 401 });
-    }
-
     const isValidRequest = await verifyKey(body, signature, timestamp, env.DISCORD_PUBLIC_KEY);
     if (!isValidRequest) {
-      console.error('Verifica della firma fallita. Assicurati che la Public Key nel portale Discord coincida con il segreto.');
       return new Response('Bad request signature', { status: 401 });
     }
 
@@ -29,57 +23,35 @@ export default {
       });
     }
 
-    if (interaction.type === InteractionType.APPLICATION_COMMAND) {
-      if (interaction.data.name === 'ask') {
-        const prompt = interaction.data.options[0].value;
-        const userId = interaction.member?.user?.id || interaction.user?.id;
+    if (interaction.type === InteractionType.APPLICATION_COMMAND && interaction.data.name === 'ask') {
+      const prompt = interaction.data.options[0].value;
+      const userId = interaction.member?.user?.id || interaction.user?.id;
+      const historyKey = `history:${userId}`;
+
+      ctx.waitUntil((async () => {
+        const historyRaw = await env.KV_ORACULUM.get(historyKey);
+        let messages = historyRaw ? JSON.parse(historyRaw) : [
+          { role: 'system', content: 'Sei OraculumAI.' }
+        ];
+        messages.push({ role: 'user', content: prompt });
+
+        const aiResponse = await env.AI.run('@cf/meta/llama-3-8b-instruct', { messages });
+        const reply = aiResponse.response;
+
+        messages.push({ role: 'assistant', content: reply });
+        await env.KV_ORACULUM.put(historyKey, JSON.stringify(messages.slice(-10)), { expirationTtl: 3600 });
+
         const endpoint = `https://discord.com/api/v10/webhooks/${env.DISCORD_APPLICATION_ID}/${interaction.token}/messages/@original`;
+        await fetch(endpoint, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: `**Domanda:** ${prompt}\n\n${reply}`.substring(0, 2000) }),
+        });
+      })());
 
-        if (!env.AI || !env.KV_ORACULUM) {
-          return new Response(JSON.stringify({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: 'Errore: I servizi AI o KV non sono stati configurati correttamente nel Worker.' },
-          }), { headers: { 'content-type': 'application/json' } });
-        }
-
-        ctx.waitUntil((async () => {
-          try {
-            const historyKey = `history:${userId}`;
-            const historyRaw = await env.KV_ORACULUM.get(historyKey);
-            let messages = historyRaw ? JSON.parse(historyRaw) : [
-              { role: 'system', content: 'Sei OraculumAI, un assistente utile. Sii conciso e amichevole.' }
-            ];
-
-            messages.push({ role: 'user', content: prompt });
-            if (messages.length > 10) messages.splice(1, 2);
-
-            const aiResponse = await env.AI.run('@cf/meta/llama-3-8b-instruct', { messages });
-            const reply = aiResponse.response;
-
-            messages.push({ role: 'assistant', content: reply });
-            await env.KV_ORACULUM.put(historyKey, JSON.stringify(messages), { expirationTtl: 3600 });
-
-            await fetch(endpoint, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                content: `> **${prompt}**\n\n${reply}`,
-              }),
-            });
-          } catch (e) {
-            console.error(e);
-            await fetch(endpoint, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ content: `Errore durante la generazione: ${e.message}` }),
-            });
-          }
-        })());
-
-        return new Response(JSON.stringify({
-          type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-        }), { headers: { 'content-type': 'application/json' } });
-      }
+      return new Response(JSON.stringify({
+        type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+      }), { headers: { 'content-type': 'application/json' } });
     }
 
     return new Response('Unknown interaction', { status: 400 });

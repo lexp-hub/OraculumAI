@@ -1,5 +1,6 @@
 const token = process.env.DISCORD_TOKEN;
 const applicationId = process.env.DISCORD_APPLICATION_ID;
+const guildId = process.env.DISCORD_GUILD_ID;
 
 if (!token || !applicationId) {
   console.error('Errore: DISCORD_TOKEN e DISCORD_APPLICATION_ID sono richiesti.');
@@ -7,7 +8,10 @@ if (!token || !applicationId) {
 }
 
 async function registerCommands() {
-  const url = `https://discord.com/api/v10/applications/${applicationId}/commands`;
+  const url = guildId 
+    ? `https://discord.com/api/v10/applications/${applicationId}/guilds/${guildId}/commands`
+    : `https://discord.com/api/v10/applications/${applicationId}/commands`;
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -24,7 +28,12 @@ async function registerCommands() {
   });
 
   const data = await response.json();
-  console.log('Risposta registrazione:', data);
+  if (response.ok) {
+    console.log('✅ Comando registrato con successo!');
+  } else {
+    console.error('❌ Errore durante la registrazione:');
+    console.error(JSON.stringify(data, null, 2));
+  }
 }
 
 registerCommands();

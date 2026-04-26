@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Discord AI Bot su Cloudflare Workers",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
