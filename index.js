@@ -65,7 +65,7 @@ async function getAIResponse(prompt, isCreator = false) {
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
 
-  const isCreator = message.author.username === 'lexproj';
+  const isCreator = message.author.id === CREATOR_ID;
 
   if (message.content.toLowerCase().includes('gay') && !isCreator) {
     return message.reply("bruciati");
