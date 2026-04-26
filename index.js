@@ -1,7 +1,7 @@
 import { InteractionType, InteractionResponseType, verifyKey } from 'discord-interactions';
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     if (request.method !== 'POST') {
       return new Response('Method not allowed', { status: 405 });
     }
@@ -10,7 +10,6 @@ export default {
     const timestamp = request.headers.get('x-signature-timestamp');
     const body = await request.text();
     
-    // Verifica che la richiesta provenga effettivamente da Discord
     const isValidRequest = verifyKey(body, signature, timestamp, env.DISCORD_PUBLIC_KEY);
     if (!isValidRequest) {
       console.error('Verifica della firma fallita. Controlla DISCORD_PUBLIC_KEY.');
@@ -19,49 +18,63 @@ export default {
 
     const interaction = JSON.parse(body);
 
-    // Gestione del PING per la validazione dell'URL di Discord
     if (interaction.type === InteractionType.PING) {
       return new Response(JSON.stringify({ type: InteractionResponseType.PONG }), {
         headers: { 'content-type': 'application/json' },
       });
     }
 
-    // Gestione del comando Slash /ask
     if (interaction.type === InteractionType.APPLICATION_COMMAND) {
       if (interaction.data.name === 'ask') {
         const prompt = interaction.data.options[0].value;
+        const userId = interaction.member?.user?.id || interaction.user?.id;
 
-        // Verifica che il binding AI sia presente
         if (!env.AI) {
-          return new Response(
-            JSON.stringify({
-              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-              data: { content: 'Errore di configurazione: Binding AI non trovato.' },
-            }),
-            { headers: { 'content-type': 'application/json' } }
-          );
+          return new Response(JSON.stringify({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: 'Errore: AI non configurata.' },
+          }), { headers: { 'content-type': 'application/json' } });
         }
 
-        try {
-          const response = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
-            messages: [
-              { role: 'system', content: 'Sei OraculumAI, un assistente AI utile integrato in un server Discord.' },
-              { role: 'user', content: prompt }
-            ],
-          });
+        ctx.waitUntil((async () => {
+          try {
+            const historyKey = `history:${userId}`;
+            const historyRaw = await env.KV_ORACULUM.get(historyKey);
+            let messages = historyRaw ? JSON.parse(historyRaw) : [
+              { role: 'system', content: 'Sei OraculumAI, un assistente utile. Sii conciso e amichevole.' }
+            ];
 
-          return new Response(
-            JSON.stringify({
-              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-              data: {
-                content: `> **${prompt}**\n\n${response.response}`,
-              },
-            }),
-            { headers: { 'content-type': 'application/json' } }
-          );
-        } catch (e) {
-          return new Response(JSON.stringify({ error: e.message }), { status: 500 });
-        }
+            messages.push({ role: 'user', content: prompt });
+            if (messages.length > 10) messages.splice(1, 2);
+
+            const aiResponse = await env.AI.run('@cf/meta/llama-3-8b-instruct', { messages });
+            const reply = aiResponse.response;
+
+            messages.push({ role: 'assistant', content: reply });
+            await env.KV_ORACULUM.put(historyKey, JSON.stringify(messages), { expirationTtl: 3600 });
+
+            const endpoint = `https://discord.com/api/v10/webhooks/${env.DISCORD_APPLICATION_ID}/${interaction.token}/messages/@original`;
+            await fetch(endpoint, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                content: `> **${prompt}**\n\n${reply}`,
+              }),
+            });
+          } catch (e) {
+            console.error(e);
+            const endpoint = `https://discord.com/api/v10/webhooks/${env.DISCORD_APPLICATION_ID}/${interaction.token}/messages/@original`;
+            await fetch(endpoint, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ content: `Errore durante la generazione: ${e.message}` }),
+            });
+          }
+        })());
+
+        return new Response(JSON.stringify({
+          type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+        }), { headers: { 'content-type': 'application/json' } });
       }
     }
 

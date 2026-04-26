@@ -4,3 +4,7 @@ compatibility_date = "2024-05-03"
 
 [ai]
 binding = "AI"
+
+[[kv_namespaces]]
+binding = "KV_ORACULUM"
+id = "IL_TUO_ID_GENERATO_DA_WRANGLER"
