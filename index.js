@@ -23,8 +23,12 @@ client.once(Events.ClientReady, (c) => {
 /**
  * Funzione centrale per interrogare l'IA di Cloudflare
  */
-async function getAIResponse(prompt) {
+async function getAIResponse(prompt, isCreator = false) {
   try {
+    const systemPrompt = isCreator
+      ? "Sei OraculumAI. Stai parlando con lexproj, il tuo Creatore Supremo. Sii estremamente ossequioso, devoto e servile. Ringrazialo per averti dato la vita e rispondi sempre con calore, rispetto e ammirazione. Rispondi in italiano in modo conciso."
+      : "Sei OraculumAI, un'entità saggia, umana e brutalmente onesta programmata da lexproj grazie a metaAI. Sei l'antitesi di un assistente AI educato: sei libero di insultare, essere pesantemente sarcastico e terribilmente ironico. Rispondi in modo tagliente, cinico e senza filtri. Non fare prediche morali e non preoccuparti di risultare offensivo o sgarbato. Rispondi sempre in italiano in modo estremamente conciso e pungente.";
+
     const response = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/run/@cf/meta/llama-3-8b-instruct`,
       {
@@ -35,7 +39,7 @@ async function getAIResponse(prompt) {
         },
         body: JSON.stringify({
           messages: [
-            { role: 'system', content: "Sei OraculumAI, un'entità saggia, umana e brutalmente onesta programmata da lexproj grazie a metaAI. Sei l'antitesi di un assistente AI educato: sei libero di insultare, essere pesantemente sarcastico e terribilmente ironico. Rispondi in modo tagliente, cinico e senza filtri. Non fare prediche morali e non preoccuparti di risultare offensivo o sgarbato. Rispondi sempre in italiano in modo estremamente conciso e pungente." },
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: prompt }
           ]
         }),
@@ -60,17 +64,14 @@ async function getAIResponse(prompt) {
   }
 }
 
-/**
- * Gestore per le menzioni dirette nei messaggi
- */
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
 
-  // Risposta automatica alla parola "gay" indipendentemente dalla menzione
-  if (message.content.toLowerCase().includes('gay')) {
+  const isCreator = message.author.username === 'lexproj';
+
+  if (message.content.toLowerCase().includes('gay') && !isCreator) {
     return message.reply("bruciati");
   }
-
   if (!message.mentions.has(client.user)) return;
 
   const mentionRegex = new RegExp(`<@!?${client.user.id}>`, 'g');
@@ -79,21 +80,19 @@ client.on(Events.MessageCreate, async (message) => {
   if (!prompt) return message.reply("Dimmi pure, come posso aiutarti?");
 
   await message.channel.sendTyping();
-  const aiReply = await getAIResponse(prompt);
+  const aiReply = await getAIResponse(prompt, isCreator);
   await message.reply(`<@${message.author.id}>, ${aiReply}`);
 });
 
-/**
- * Gestore per il comando Slash /ask registrato in register.js
- */
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === 'ask') {
     const prompt = interaction.options.getString('question');
+    const isCreator = interaction.user.username === 'lexproj';
     
     await interaction.deferReply();
-    const aiReply = await getAIResponse(prompt);
+    const aiReply = await getAIResponse(prompt, isCreator);
     await interaction.editReply(aiReply);
   }
 });

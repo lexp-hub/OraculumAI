@@ -1,6 +1,5 @@
 import dotenv from 'dotenv';
 
-// Carica esplicitamente il file .env
 dotenv.config();
 
 const token = process.env.DISCORD_TOKEN;
