@@ -20,19 +20,10 @@ client.once(Events.ClientReady, (c) => {
   console.log(`✅ Oracolo Online! Autenticato come ${c.user.tag}`);
 });
 
-client.on(Events.MessageCreate, async (message) => {
-  if (message.author.bot) return;
-  if (!message.mentions.has(client.user)) return;
-
-  const mentionRegex = new RegExp(`<@!?${client.user.id}>`, 'g');
-  const prompt = message.content.replace(mentionRegex, '').trim();
-
-  if (!prompt) {
-    return message.reply("Dimmi pure, come posso aiutarti?");
-  }
-
-  await message.channel.sendTyping();
-
+/**
+ * Funzione centrale per interrogare l'IA di Cloudflare
+ */
+async function getAIResponse(prompt) {
   try {
     const response = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/run/@cf/meta/llama-3-8b-instruct`,
@@ -51,20 +42,52 @@ client.on(Events.MessageCreate, async (message) => {
       }
     );
 
-    if (!response.ok) throw new Error(`Cloudflare API Error: ${response.statusText}`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('❌ Cloudflare AI Error Details:', errorData);
+      throw new Error(`Cloudflare API Error: ${response.statusText}`);
+    }
 
     const result = await response.json();
     const reply = result?.result?.response;
 
     if (!reply) throw new Error("Risposta vuota dall'IA");
 
-    let content = `<@${message.author.id}>, ${reply}`;
-    if (content.length > 2000) content = content.substring(0, 1997) + '...';
-
-    await message.reply(content);
+    return reply.length > 2000 ? reply.substring(0, 1997) + '...' : reply;
   } catch (err) {
-    console.error('❌ Errore:', err);
-    await message.reply("Scusa, l'Oracolo è stanco. Riprova più tardi.");
+    console.error('❌ Errore durante la chiamata AI:', err);
+    return "Scusa, l'Oracolo è stanco. Riprova più tardi.";
+  }
+}
+
+/**
+ * Gestore per le menzioni dirette nei messaggi
+ */
+client.on(Events.MessageCreate, async (message) => {
+  if (message.author.bot || !message.mentions.has(client.user)) return;
+
+  const mentionRegex = new RegExp(`<@!?${client.user.id}>`, 'g');
+  const prompt = message.content.replace(mentionRegex, '').trim();
+
+  if (!prompt) return message.reply("Dimmi pure, come posso aiutarti?");
+
+  await message.channel.sendTyping();
+  const aiReply = await getAIResponse(prompt);
+  await message.reply(`<@${message.author.id}>, ${aiReply}`);
+});
+
+/**
+ * Gestore per il comando Slash /ask registrato in register.js
+ */
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === 'ask') {
+    const prompt = interaction.options.getString('question');
+    
+    await interaction.deferReply();
+    const aiReply = await getAIResponse(prompt);
+    await interaction.editReply(aiReply);
   }
 });
 
