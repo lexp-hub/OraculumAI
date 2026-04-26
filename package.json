@@ -4,6 +4,9 @@
   "description": "Discord AI Bot su Cloudflare Workers",
   "main": "index.js",
   "type": "module",
+  "engines": {
+    "node": ">=20.18.1"
+  },
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
