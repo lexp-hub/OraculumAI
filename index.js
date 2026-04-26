@@ -65,9 +65,7 @@ async function getAIResponse(prompt, isCreator = false) {
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
 
-  const isCreator = message.author.id === CREATOR_ID;
-
-  if (message.content.toLowerCase().includes('gay') && !isCreator) {
+  if (message.content.toLowerCase().includes('gay') && message.author.id !== CREATOR_ID) {
     return message.reply("bruciati");
   }
 
@@ -79,7 +77,7 @@ client.on(Events.MessageCreate, async (message) => {
   if (!prompt) return message.reply("Dimmi pure, come posso aiutarti?");
 
   await message.channel.sendTyping();
-  const aiReply = await getAIResponse(prompt, isCreator);
+  const aiReply = await getAIResponse(prompt, message.author.id === CREATOR_ID);
   await message.reply(`<@${message.author.id}>, ${aiReply}`);
 });
 
@@ -88,10 +86,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   if (interaction.commandName === 'ask') {
     const prompt = interaction.options.getString('question');
-    const isCreator = interaction.user.id === CREATOR_ID;
+
+    if (prompt.toLowerCase().includes('gay') && interaction.user.id !== CREATOR_ID) {
+      return interaction.reply("bruciati");
+    }
     
     await interaction.deferReply();
-    const aiReply = await getAIResponse(prompt, isCreator);
+    const aiReply = await getAIResponse(prompt, interaction.user.id === CREATOR_ID);
     await interaction.editReply(aiReply);
   }
 });
