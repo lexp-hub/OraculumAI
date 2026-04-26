@@ -1,0 +1,17 @@
+{
+  "name": "OraculumAI",
+  "version": "1.0.0",
+  "description": "Discord AI Bot su Cloudflare Workers",
+  "main": "index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "register": "node register.js"
+  },
+  "dependencies": {
+    "discord-interactions": "^4.4.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
