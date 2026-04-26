@@ -1,7 +1,5 @@
-node_modules
-.wrangler
-.dev.vars
-dist
-package-lock.json
 .env
+node_modules/
+.dev.vars
+.wrangler/
 *.log

@@ -1,59 +1,71 @@
-import { InteractionType, InteractionResponseType, verifyKey } from 'discord-interactions';
+import { Client, GatewayIntentBits, Events } from 'discord.js';
+import 'dotenv/config';
 
-export default {
-  async fetch(request, env, ctx) {
-    if (request.method !== 'POST') {
-      return new Response('Method not allowed', { status: 405 });
-    }
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
+});
 
-    const signature = request.headers.get('x-signature-ed25519');
-    const timestamp = request.headers.get('x-signature-timestamp');
-    const body = await request.text();
+const { DISCORD_TOKEN, DISCORD_APPLICATION_ID, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN } = process.env;
 
-    const isValidRequest = await verifyKey(body, signature, timestamp, env.DISCORD_PUBLIC_KEY);
-    if (!isValidRequest) {
-      return new Response('Bad request signature', { status: 401 });
-    }
+if (!DISCORD_TOKEN || !DISCORD_APPLICATION_ID || !CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
+  console.error('❌ Errore: Configurazione incompleta nel file .env. Verifica TOKEN, APP_ID e chiavi Cloudflare.');
+  process.exit(1);
+}
 
-    const interaction = JSON.parse(body);
+client.once(Events.ClientReady, (c) => {
+  console.log(`✅ Oracolo Online! Autenticato come ${c.user.tag}`);
+});
 
-    if (interaction.type === InteractionType.PING) {
-      return new Response(JSON.stringify({ type: InteractionResponseType.PONG }), {
-        headers: { 'content-type': 'application/json' },
-      });
-    }
+client.on(Events.MessageCreate, async (message) => {
+  if (message.author.bot) return;
+  if (!message.mentions.has(client.user)) return;
 
-    if (interaction.type === InteractionType.APPLICATION_COMMAND && interaction.data.name === 'ask') {
-      const prompt = interaction.data.options[0].value;
-      const userId = interaction.member?.user?.id || interaction.user?.id;
-      const historyKey = `history:${userId}`;
+  const mentionRegex = new RegExp(`<@!?${client.user.id}>`, 'g');
+  const prompt = message.content.replace(mentionRegex, '').trim();
 
-      ctx.waitUntil((async () => {
-        const historyRaw = await env.KV_ORACULUM.get(historyKey);
-        let messages = historyRaw ? JSON.parse(historyRaw) : [
-          { role: 'system', content: 'Sei OraculumAI.' }
-        ];
-        messages.push({ role: 'user', content: prompt });
+  if (!prompt) {
+    return message.reply("Dimmi pure, come posso aiutarti?");
+  }
 
-        const aiResponse = await env.AI.run('@cf/meta/llama-3-8b-instruct', { messages });
-        const reply = aiResponse.response;
+  await message.channel.sendTyping();
 
-        messages.push({ role: 'assistant', content: reply });
-        await env.KV_ORACULUM.put(historyKey, JSON.stringify(messages.slice(-10)), { expirationTtl: 3600 });
+  try {
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/run/@cf/meta/llama-3-8b-instruct`,
+      {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${CLOUDFLARE_API_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: 'Sei OraculumAI, un assistente utile e saggio. Rispondi in modo conciso in italiano.' },
+            { role: 'user', content: prompt }
+          ]
+        }),
+      }
+    );
 
-        const endpoint = `https://discord.com/api/v10/webhooks/${env.DISCORD_APPLICATION_ID}/${interaction.token}/messages/@original`;
-        await fetch(endpoint, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: `**Domanda:** ${prompt}\n\n${reply}`.substring(0, 2000) }),
-        });
-      })());
+    if (!response.ok) throw new Error(`Cloudflare API Error: ${response.statusText}`);
 
-      return new Response(JSON.stringify({
-        type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-      }), { headers: { 'content-type': 'application/json' } });
-    }
+    const result = await response.json();
+    const reply = result?.result?.response;
 
-    return new Response('Unknown interaction', { status: 400 });
-  },
-};
+    if (!reply) throw new Error("Risposta vuota dall'IA");
+
+    let content = `<@${message.author.id}>, ${reply}`;
+    if (content.length > 2000) content = content.substring(0, 1997) + '...';
+
+    await message.reply(content);
+  } catch (err) {
+    console.error('❌ Errore:', err);
+    await message.reply("Scusa, l'Oracolo è stanco. Riprova più tardi.");
+  }
+});
+
+client.login(DISCORD_TOKEN);

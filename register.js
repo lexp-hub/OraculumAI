@@ -1,9 +1,21 @@
+import dotenv from 'dotenv';
+
+// Carica esplicitamente il file .env
+dotenv.config();
+
 const token = process.env.DISCORD_TOKEN;
 const applicationId = process.env.DISCORD_APPLICATION_ID;
 const guildId = process.env.DISCORD_GUILD_ID;
 
 if (!token || !applicationId) {
-  console.error('Errore: DISCORD_TOKEN e DISCORD_APPLICATION_ID sono richiesti.');
+  console.error('❌ Errore: Variabili di configurazione mancanti.');
+  if (!token) {
+    console.error('   -> DISCORD_TOKEN non è presente nel file .env');
+  }
+  if (!applicationId) {
+    console.error('   -> DISCORD_APPLICATION_ID non è presente nel file .env');
+  }
+  console.log('\nAssicurati che il file .env esista nella radice del progetto e contenga i valori corretti.');
   process.exit(1);
 }
 
