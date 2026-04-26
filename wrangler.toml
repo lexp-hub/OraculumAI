@@ -2,8 +2,5 @@ name = "oraculum-ai"
 main = "index.js"
 compatibility_date = "2024-05-03"
 
-[vars]
-DISCORD_APPLICATION_ID = "1255474334085025853"
-
-[[ai]]
+[ai]
 binding = "AI"

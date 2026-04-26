@@ -13,6 +13,7 @@ export default {
     // Verifica che la richiesta provenga effettivamente da Discord
     const isValidRequest = verifyKey(body, signature, timestamp, env.DISCORD_PUBLIC_KEY);
     if (!isValidRequest) {
+      console.error('Verifica della firma fallita. Controlla DISCORD_PUBLIC_KEY.');
       return new Response('Bad request signature', { status: 401 });
     }
 
@@ -29,6 +30,17 @@ export default {
     if (interaction.type === InteractionType.APPLICATION_COMMAND) {
       if (interaction.data.name === 'ask') {
         const prompt = interaction.data.options[0].value;
+
+        // Verifica che il binding AI sia presente
+        if (!env.AI) {
+          return new Response(
+            JSON.stringify({
+              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+              data: { content: 'Errore di configurazione: Binding AI non trovato.' },
+            }),
+            { headers: { 'content-type': 'application/json' } }
+          );
+        }
 
         try {
           const response = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
