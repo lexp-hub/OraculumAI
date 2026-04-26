@@ -10,6 +10,7 @@ const client = new Client({
 });
 
 const { DISCORD_TOKEN, DISCORD_APPLICATION_ID, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN } = process.env;
+const CREATOR_ID = '829004501419556864';
 
 if (!DISCORD_TOKEN || !DISCORD_APPLICATION_ID || !CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
   console.error('❌ Errore: Configurazione incompleta nel file .env. Verifica TOKEN, APP_ID e chiavi Cloudflare.');
@@ -20,9 +21,6 @@ client.once(Events.ClientReady, (c) => {
   console.log(`✅ Oracolo Online! Autenticato come ${c.user.tag}`);
 });
 
-/**
- * Funzione centrale per interrogare l'IA di Cloudflare
- */
 async function getAIResponse(prompt, isCreator = false) {
   try {
     const systemPrompt = isCreator
@@ -72,6 +70,7 @@ client.on(Events.MessageCreate, async (message) => {
   if (message.content.toLowerCase().includes('gay') && !isCreator) {
     return message.reply("bruciati");
   }
+
   if (!message.mentions.has(client.user)) return;
 
   const mentionRegex = new RegExp(`<@!?${client.user.id}>`, 'g');
@@ -89,7 +88,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   if (interaction.commandName === 'ask') {
     const prompt = interaction.options.getString('question');
-    const isCreator = interaction.user.username === 'lexproj';
+    const isCreator = interaction.user.id === CREATOR_ID;
     
     await interaction.deferReply();
     const aiReply = await getAIResponse(prompt, isCreator);
