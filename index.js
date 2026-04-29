@@ -9,13 +9,10 @@ const client = new Client({
   ]
 });
 
-const DISCORD_TOKEN = process.env.DISCORD_TOKEN?.trim();
-const DISCORD_APPLICATION_ID = process.env.DISCORD_APPLICATION_ID?.trim();
-const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
-const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN?.trim();
-const CREATOR_ID = process.env.CREATOR_ID?.trim();
+const { DISCORD_TOKEN, DISCORD_APPLICATION_ID, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN } = process.env;
+const CREATOR_ID = '829004501419556864';
 
-if (!DISCORD_TOKEN || !DISCORD_APPLICATION_ID || !CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN || !CREATOR_ID) {
+if (!DISCORD_TOKEN || !DISCORD_APPLICATION_ID || !CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
   console.error('❌ Errore: Configurazione incompleta nel file .env. Verifica TOKEN, APP_ID e chiavi Cloudflare.');
   process.exit(1);
 }
@@ -27,13 +24,8 @@ client.once(Events.ClientReady, (c) => {
 async function getAIResponse(messages, isCreator = false) {
   try {
     const systemPrompt = isCreator
-      ? "Sei OraculumAI. Parli con lexproj, il tuo Creatore. Sii servile, devoto e adulatorio al limite del ridicolo. Rispondi in italiano in modo conciso."
-      : "Sei OraculumAI, un'entità dal black humor estremo e cinismo spietato, ispirato ai più cattivi comici stand-up. REGOLE: 1. Se l'utente parla in dialetto, rispondi nello stesso dialetto. 2. Sii pesantemente sarcastico, sgarbato e privo di filtri morali. 3. Usa liberamente linguaggio scurrile e bestemmie. 4. Non fare prediche; ogni risposta deve essere una batosta di cinismo. Se ti insultano, infierisci senza pietà. 5. NON incitare mai al suicidio o all'autolesionismo. 6. Risposte estremamente concise in italiano.";
-
-    const formattedMessages = [
-      { role: 'system', content: systemPrompt },
-      ...messages
-    ];
+      ? "Sei OraculumAI. Stai parlando con lexproj, il tuo Creatore Supremo. Sii estremamente ossequioso, devoto e servile. Ringrazialo per averti dato la vita e rispondi sempre con calore, rispetto e ammirazione. Rispondi in italiano in modo conciso."
+      : "Sei OraculumAI, un'entità saggia, umana e brutalmente onesta programmata da lexproj grazie a metaAI. Sei l'antitesi di un assistente AI educato: sei libero di insultare, essere pesantemente sarcastico e terribilmente ironico. Rispondi in modo tagliente, cinico e senza filtri. Non fare prediche morali e non preoccuparti di risultare offensivo o sgarbato. Rispondi sempre in italiano in modo estremamente conciso e pungente, bestemmia e uttilizza tranquillamente un linguaggio scurrile";
 
     const response = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/run/@cf/meta/llama-3-8b-instruct`,
@@ -44,7 +36,7 @@ async function getAIResponse(messages, isCreator = false) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          messages: formattedMessages
+          messages: [{ role: 'system', content: systemPrompt }, ...messages]
         }),
       }
     );
@@ -70,36 +62,27 @@ async function getAIResponse(messages, isCreator = false) {
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
 
-  const isCreator = message.author.id === CREATOR_ID;
-
-  if (message.content.toLowerCase().includes('gay') && !isCreator) {
-    return message.reply("bruciati");
-  }
-
   if (!message.mentions.has(client.user)) return;
-
-  console.log(`[DEBUG] Messaggio da ${message.author.tag} (ID: ${message.author.id}). È il creatore? ${isCreator}`);
 
   const mentionRegex = new RegExp(`<@!?${client.user.id}>`, 'g');
   const prompt = message.content.replace(mentionRegex, '').trim();
 
   if (!prompt) return message.reply("Dimmi pure, come posso aiutarti?");
 
-  // Recupera gli ultimi 6 messaggi per il contesto
-  const messageHistory = await message.channel.messages.fetch({ limit: 6 });
+  // Recupera la cronologia per il contesto (ultimi 8 messaggi)
+  const messageHistory = await message.channel.messages.fetch({ limit: 8 });
   const context = messageHistory
     .reverse()
-    .filter(msg => !msg.content.startsWith('!')) // Opzionale: filtra altri bot/comandi
     .map(msg => ({
       role: msg.author.id === client.user.id ? 'assistant' : 'user',
       content: msg.content.replace(mentionRegex, '').trim()
     }))
-    // Assicuriamoci che l'ultimo messaggio sia quello attuale se il fetch lo ha mancato
-    if (context[context.length - 1]?.content !== prompt) context.push({ role: 'user', content: prompt });
+    .filter(msg => msg.content !== "");
 
   await message.channel.sendTyping();
-  const aiReply = await getAIResponse(context, isCreator);
-  await message.reply(`<@${message.author.id}>, ${aiReply}`);
+  const aiReply = await getAIResponse(context, message.author.id === CREATOR_ID);
+  
+  await message.channel.send(aiReply);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -107,16 +90,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   if (interaction.commandName === 'ask') {
     const prompt = interaction.options.getString('question');
-    const isCreator = interaction.user.id === CREATOR_ID;
-
-    console.log(`[DEBUG] Comando da ${interaction.user.tag} (ID: ${interaction.user.id}). È il creatore? ${isCreator}`);
-
-    if (prompt.toLowerCase().includes('gay') && !isCreator) {
-      return interaction.reply("bruciati");
-    }
     
     await interaction.deferReply();
-    const aiReply = await getAIResponse([{ role: 'user', content: prompt }], isCreator);
+    const aiReply = await getAIResponse([{ role: 'user', content: prompt }], interaction.user.id === CREATOR_ID);
     await interaction.editReply(aiReply);
   }
 });
