@@ -27,6 +27,7 @@ OraculumAI è un bot Discord avanzato che integra l'intelligenza artificiale di 
    DISCORD_GUILD_ID=id_server (opzionale per registrazione rapida)
    CLOUDFLARE_ACCOUNT_ID=tuo_id_account
    CLOUDFLARE_API_TOKEN=tuo_api_token
+   CREATOR_ID=il_tuo_id_discord
    ```
 
 3. Registra i comandi slash:

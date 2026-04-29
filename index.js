@@ -9,10 +9,13 @@ const client = new Client({
   ]
 });
 
-const { DISCORD_TOKEN, DISCORD_APPLICATION_ID, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN } = process.env;
-const CREATOR_ID = '829004501419556864';
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN?.trim();
+const DISCORD_APPLICATION_ID = process.env.DISCORD_APPLICATION_ID?.trim();
+const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN?.trim();
+const CREATOR_ID = process.env.CREATOR_ID?.trim();
 
-if (!DISCORD_TOKEN || !DISCORD_APPLICATION_ID || !CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
+if (!DISCORD_TOKEN || !DISCORD_APPLICATION_ID || !CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN || !CREATOR_ID) {
   console.error('❌ Errore: Configurazione incompleta nel file .env. Verifica TOKEN, APP_ID e chiavi Cloudflare.');
   process.exit(1);
 }
@@ -65,11 +68,15 @@ async function getAIResponse(prompt, isCreator = false) {
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
 
-  if (message.content.toLowerCase().includes('gay') && message.author.id !== CREATOR_ID) {
+  const isCreator = message.author.id === CREATOR_ID;
+
+  if (message.content.toLowerCase().includes('gay') && !isCreator) {
     return message.reply("bruciati");
   }
 
   if (!message.mentions.has(client.user)) return;
+
+  console.log(`[DEBUG] Messaggio da ${message.author.tag} (ID: ${message.author.id}). È il creatore? ${isCreator}`);
 
   const mentionRegex = new RegExp(`<@!?${client.user.id}>`, 'g');
   const prompt = message.content.replace(mentionRegex, '').trim();
@@ -77,7 +84,7 @@ client.on(Events.MessageCreate, async (message) => {
   if (!prompt) return message.reply("Dimmi pure, come posso aiutarti?");
 
   await message.channel.sendTyping();
-  const aiReply = await getAIResponse(prompt, message.author.id === CREATOR_ID);
+  const aiReply = await getAIResponse(prompt, isCreator);
   await message.reply(`<@${message.author.id}>, ${aiReply}`);
 });
 
@@ -86,13 +93,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   if (interaction.commandName === 'ask') {
     const prompt = interaction.options.getString('question');
+    const isCreator = interaction.user.id === CREATOR_ID;
 
-    if (prompt.toLowerCase().includes('gay') && interaction.user.id !== CREATOR_ID) {
+    console.log(`[DEBUG] Comando da ${interaction.user.tag} (ID: ${interaction.user.id}). È il creatore? ${isCreator}`);
+
+    if (prompt.toLowerCase().includes('gay') && !isCreator) {
       return interaction.reply("bruciati");
     }
     
     await interaction.deferReply();
-    const aiReply = await getAIResponse(prompt, interaction.user.id === CREATOR_ID);
+    const aiReply = await getAIResponse(prompt, isCreator);
     await interaction.editReply(aiReply);
   }
 });

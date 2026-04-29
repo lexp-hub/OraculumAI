@@ -2,9 +2,9 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const token = process.env.DISCORD_TOKEN;
-const applicationId = process.env.DISCORD_APPLICATION_ID;
-const guildId = process.env.DISCORD_GUILD_ID;
+const token = process.env.DISCORD_TOKEN?.trim();
+const applicationId = process.env.DISCORD_APPLICATION_ID?.trim();
+const guildId = process.env.DISCORD_GUILD_ID?.trim();
 
 if (!token || !applicationId) {
   console.error('❌ Errore: Variabili di configurazione mancanti.');
