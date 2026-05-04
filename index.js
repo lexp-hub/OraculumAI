@@ -167,10 +167,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
           if (text && text.length > 2) {
             console.log(`[STT] ${userId} ha detto: ${text}`);
-            const aiReply = await getAIResponse([{ role: 'user', content: text }], userId === CREATOR_ID);
-            speak(aiReply, connection);
+            try {
+              const aiReply = await getAIResponse([{ role: 'user', content: text }], userId === CREATOR_ID);
+              await speak(aiReply, connection);
+            } catch (error) {
+              console.error("❌ Errore nella risposta vocale:", error);
+            }
           }
           recognizer.free();
+          pcmStream.destroy();
         });
       });
     });
