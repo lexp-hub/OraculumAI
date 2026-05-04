@@ -8,6 +8,7 @@ import fs from 'fs';
 import vosk from 'vosk';
 import prism from 'prism-media';
 import * as googleTTS from 'google-tts-api';
+import path from 'path';
 
 const client = new Client({
   intents: [
@@ -24,7 +25,7 @@ const CREATOR_ID = '829004501419556864';
 
 let model = null;
 try {
-  const MODEL_PATH = "./model";
+  const MODEL_PATH = path.resolve("model");
   if (fs.existsSync(MODEL_PATH)) {
     model = new vosk.Model(MODEL_PATH);
   } else {
