@@ -22,12 +22,15 @@ const client = new Client({
 const { DISCORD_TOKEN, DISCORD_APPLICATION_ID, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN } = process.env;
 const CREATOR_ID = '829004501419556864';
 
-// Inizializzazione Vosk (Modello locale per la privacy)
-const MODEL_PATH = "./model";
-if (!fs.existsSync(MODEL_PATH)) {
-  console.error("❌ Cartella 'model' non trovata. Scarica un modello Vosk per l'italiano e mettilo in ./model");
-}
-const model = new vosk.Model(MODEL_PATH);
+let model = null;
+try {
+  const MODEL_PATH = "./model";
+  if (fs.existsSync(MODEL_PATH)) {
+    model = new vosk.Model(MODEL_PATH);
+  } else {
+    console.warn("⚠️ Cartella 'model' non trovata. L'ascolto vocale (STT) è disabilitato.");
+  }
+} catch (err) { console.error("❌ Errore nel caricamento del modello Vosk:", err); }
 const player = createAudioPlayer();
 
 if (!DISCORD_TOKEN || !DISCORD_APPLICATION_ID || !CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
@@ -135,6 +138,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.commandName === 'voice_join') {
     const channel = interaction.member.voice.channel;
     if (!channel) return interaction.reply("Entra in un canale vocale, sfigato.");
+
+    if (!model) return interaction.reply("Non posso ascoltarti perché il mio creatore non ha installato il modello Vosk. Che delusione.");
 
     const connection = joinVoiceChannel({
       channelId: channel.id,
