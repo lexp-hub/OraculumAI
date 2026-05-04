@@ -24,18 +24,28 @@ async function registerCommands() {
     : `https://discord.com/api/v10/applications/${applicationId}/commands`;
 
   const response = await fetch(url, {
-    method: 'POST',
+    method: 'PUT',
     headers: {
       Authorization: `Bot ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      name: 'ask',
-      description: 'Fai una domanda a OraculumAI',
-      options: [
-        { name: 'question', description: 'La tua domanda', type: 3, required: true }
-      ],
-    }),
+      body: JSON.stringify([
+        {
+          name: 'ask',
+          description: 'Fai una domanda a OraculumAI',
+          options: [
+            { name: 'question', description: 'La tua domanda', type: 3, required: true }
+          ],
+        },
+        {
+          name: 'voice_join',
+          description: 'Fai entrare l\'Oracolo nel tuo canale vocale'
+        },
+        {
+          name: 'voice_leave',
+          description: 'Caccia l\'Oracolo dal canale vocale'
+        }
+      ]),
   });
 
   const data = await response.json();
